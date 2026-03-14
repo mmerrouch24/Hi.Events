@@ -111,13 +111,7 @@ class MarkOrderAsPaidService
 
             $this->storeApplicationFeePayment($updatedOrder);
 
-            $this->sendOrderDetailsService->sendCustomerOrderSummary(
-                order: $updatedOrder,
-                event: $event,
-                organizer: $event->getOrganizer(),
-                eventSettings: $event->getEventSettings(),
-                invoice: $order->getLatestInvoice(),
-            );
+            $this->sendOrderDetailsService->sendCustomerOrderSummaryAndTickets($updatedOrder);
 
             return $updatedOrder;
         });

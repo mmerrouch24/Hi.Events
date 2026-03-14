@@ -51,7 +51,6 @@ class SendOrderDetailsService
 
         if ($order->isOrderAwaitingOfflinePayment()) {
             $this->sendOrganizerOrderSummary($order, $event);
-            $this->sendAttendeeTicketEmails($order, $event);
         }
 
         if ($order->isOrderFailed()) {
@@ -87,6 +86,30 @@ class SendOrderDetailsService
             ->to($order->getEmail())
             ->locale($order->getLocale())
             ->send($mail);
+    }
+
+    public function sendCustomerOrderSummaryAndTickets(OrderDomainObject $order): void
+    {
+        $order = $this->orderRepository
+            ->loadRelation(OrderItemDomainObject::class)
+            ->loadRelation(AttendeeDomainObject::class)
+            ->loadRelation(InvoiceDomainObject::class)
+            ->findById($order->getId());
+
+        $event = $this->eventRepository
+            ->loadRelation(new Relationship(OrganizerDomainObject::class, name: 'organizer'))
+            ->loadRelation(new Relationship(EventSettingDomainObject::class))
+            ->findById($order->getEventId());
+
+        $this->sendCustomerOrderSummary(
+            order: $order,
+            event: $event,
+            organizer: $event->getOrganizer(),
+            eventSettings: $event->getEventSettings(),
+            invoice: $order->getLatestInvoice(),
+        );
+
+        $this->sendAttendeeTicketEmails($order, $event);
     }
 
     private function sendAttendeeTicketEmails(OrderDomainObject $order, EventDomainObject $event): void
