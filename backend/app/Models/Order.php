@@ -21,6 +21,11 @@ class Order extends BaseModel
         return $this->hasOne(StripePayment::class);
     }
 
+    public function cmi_payment(): HasOne
+    {
+        return $this->hasOne(CmiPayment::class)->latestOfMany();
+    }
+
     public function order_items(): HasMany
     {
         return $this->hasMany(OrderItem::class);

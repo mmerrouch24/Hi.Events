@@ -18,17 +18,24 @@ import {trackEvent, AnalyticsEvents} from "../../../../utilites/analytics.ts";
  * It will also make local development easier in times when the webhook is not configured correctly.
  **/
 export const PaymentReturn = () => {
+    const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const provider = searchParams.get('provider');
+    const isCmiReturn = provider === 'CMI';
     const [shouldPoll, setShouldPoll] = useState(true);
     const {eventId, orderShortId} = useParams();
     const {data: order} = usePollGetOrderPublic(eventId, orderShortId, shouldPoll, ['event']);
     const navigate = useNavigate();
     const [attemptManualConfirmation, setAttemptManualConfirmation] = useState(false);
-    const paymentIntentQuery = useGetOrderStripePaymentIntentPublic(eventId, orderShortId, attemptManualConfirmation);
+    const paymentIntentQuery = useGetOrderStripePaymentIntentPublic(eventId, orderShortId, attemptManualConfirmation && !isCmiReturn);
     const [cannotConfirmPayment, setCannotConfirmPayment] = useState(false);
     const hasTrackedPurchase = useRef(false);
 
     useEffect(
         () => {
+            if (isCmiReturn) {
+                return;
+            }
+
             const timeout = setTimeout(() => {
                 setShouldPoll(false);
                 setAttemptManualConfirmation(true);
@@ -38,10 +45,13 @@ export const PaymentReturn = () => {
                 clearTimeout(timeout);
             };
         },
-        []
+        [isCmiReturn]
     );
 
     useEffect(() => {
+        if (isCmiReturn) {
+            return;
+        }
         if (!paymentIntentQuery.isFetched) {
             return;
         }
@@ -58,7 +68,7 @@ export const PaymentReturn = () => {
             // This should be a rare occurrence, but we should handle it gracefully.
             setCannotConfirmPayment(true);
         }
-    }, [paymentIntentQuery.isFetched]);
+    }, [paymentIntentQuery.isFetched, isCmiReturn]);
 
     useEffect(() => {
         if (isSsr() || !order) {

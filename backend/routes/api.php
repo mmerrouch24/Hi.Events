@@ -1,6 +1,8 @@
 <?php
 
 use HiEvents\Http\Actions\Accounts\CreateAccountAction;
+use HiEvents\Http\Actions\Accounts\Cmi\GetAccountCmiConfigAction;
+use HiEvents\Http\Actions\Accounts\Cmi\UpsertAccountCmiConfigAction;
 use HiEvents\Http\Actions\Accounts\GetAccountAction;
 use HiEvents\Http\Actions\Accounts\Stripe\CreateStripeConnectAccountAction;
 use HiEvents\Http\Actions\Accounts\Stripe\GetStripeConnectAccountsAction;
@@ -89,6 +91,9 @@ use HiEvents\Http\Actions\Orders\GetOrderAction;
 use HiEvents\Http\Actions\Orders\GetOrdersAction;
 use HiEvents\Http\Actions\Orders\MarkOrderAsPaidAction;
 use HiEvents\Http\Actions\Orders\MessageOrderAction;
+use HiEvents\Http\Actions\Orders\Payment\CMI\CmiCallbackAction;
+use HiEvents\Http\Actions\Orders\Payment\CMI\CmiReturnAction;
+use HiEvents\Http\Actions\Orders\Payment\CMI\CreatePaymentRequestActionPublic;
 use HiEvents\Http\Actions\Orders\Payment\RefundOrderAction;
 use HiEvents\Http\Actions\Orders\Payment\Stripe\CreatePaymentIntentActionPublic;
 use HiEvents\Http\Actions\Orders\Payment\Stripe\GetPaymentIntentActionPublic;
@@ -262,6 +267,8 @@ $router->middleware(['auth:api'])->group(
         $router->put('/accounts/{account_id?}', UpdateAccountAction::class);
         $router->get('/accounts/{account_id}/stripe/connect_accounts', GetStripeConnectAccountsAction::class);
         $router->post('/accounts/{account_id}/stripe/connect', CreateStripeConnectAccountAction::class);
+        $router->get('/accounts/{account_id}/cmi-config', GetAccountCmiConfigAction::class);
+        $router->put('/accounts/{account_id}/cmi-config', UpsertAccountCmiConfigAction::class);
 
         // VAT Settings
         $router->get('/accounts/{account_id}/vat-settings', GetAccountVatSettingAction::class);
@@ -514,12 +521,15 @@ $router->prefix('/public')->group(
         // Stripe payment gateway
         $router->post('/events/{event_id}/order/{order_short_id}/stripe/payment_intent', CreatePaymentIntentActionPublic::class);
         $router->get('/events/{event_id}/order/{order_short_id}/stripe/payment_intent', GetPaymentIntentActionPublic::class);
+        $router->post('/events/{event_id}/order/{order_short_id}/cmi/payment_request', CreatePaymentRequestActionPublic::class);
 
         // Questions
         $router->get('/events/{event_id}/questions', GetQuestionsPublicAction::class);
 
         // Webhooks
         $router->post('/webhooks/stripe', StripeIncomingWebhookAction::class);
+        $router->post('/payments/cmi/callback', CmiCallbackAction::class);
+        $router->post('/payments/cmi/return', CmiReturnAction::class);
 
         // Check-In
         $router->get('/check-in-lists/{check_in_list_short_id}', GetCheckInListPublicAction::class);

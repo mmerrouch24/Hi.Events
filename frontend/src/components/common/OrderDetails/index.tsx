@@ -76,7 +76,7 @@ export const OrderDetails = ({order, event, cardVariant = 'lightGray', style = {
                         {t`Payment provider`}
                     </div>
                     <div className={classes.amount}>
-                        {capitalize(order.payment_provider)}
+                        {order.payment_provider === 'CMI' ? 'CMI' : capitalize(order.payment_provider)}
                     </div>
                 </div>
             )}

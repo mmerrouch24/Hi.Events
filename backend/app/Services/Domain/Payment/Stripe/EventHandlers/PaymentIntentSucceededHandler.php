@@ -8,31 +8,16 @@ use Brick\Math\Exception\RoundingNecessaryException;
 use Brick\Money\Exception\UnknownCurrencyException;
 use Carbon\Carbon;
 use HiEvents\DomainObjects\Enums\PaymentProviders;
-use HiEvents\DomainObjects\EventSettingDomainObject;
-use HiEvents\DomainObjects\Generated\EventSettingDomainObjectAbstract;
-use HiEvents\DomainObjects\Generated\OrderDomainObjectAbstract;
 use HiEvents\DomainObjects\Generated\StripePaymentDomainObjectAbstract;
 use HiEvents\DomainObjects\OrderDomainObject;
-use HiEvents\DomainObjects\OrderItemDomainObject;
-use HiEvents\DomainObjects\Status\AttendeeStatus;
-use HiEvents\DomainObjects\Status\OrderApplicationFeeStatus;
 use HiEvents\DomainObjects\Status\OrderPaymentStatus;
-use HiEvents\DomainObjects\Status\OrderStatus;
-use HiEvents\Events\OrderStatusChangedEvent;
 use HiEvents\Exceptions\CannotAcceptPaymentException;
 use HiEvents\Exceptions\Stripe\StripeClientConfigurationException;
 use HiEvents\Repository\Eloquent\StripePaymentsRepository;
 use HiEvents\Repository\Eloquent\Value\Relationship;
-use HiEvents\Repository\Interfaces\AffiliateRepositoryInterface;
-use HiEvents\Repository\Interfaces\AttendeeRepositoryInterface;
-use HiEvents\Repository\Interfaces\EventSettingsRepositoryInterface;
 use HiEvents\Repository\Interfaces\OrderRepositoryInterface;
-use HiEvents\Services\Domain\Order\OrderApplicationFeeService;
+use HiEvents\Services\Domain\Order\CompleteOnlineOrderPaymentService;
 use HiEvents\Services\Domain\Payment\Stripe\StripeRefundExpiredOrderService;
-use HiEvents\Services\Domain\Product\ProductQuantityUpdateService;
-use HiEvents\Services\Infrastructure\DomainEvents\DomainEventDispatcherService;
-use HiEvents\Services\Infrastructure\DomainEvents\Enums\DomainEventType;
-use HiEvents\Services\Infrastructure\DomainEvents\Events\OrderEvent;
 use Illuminate\Cache\Repository;
 use Illuminate\Database\DatabaseManager;
 use Psr\Log\LoggerInterface;
@@ -45,16 +30,11 @@ class PaymentIntentSucceededHandler
     public function __construct(
         private readonly OrderRepositoryInterface         $orderRepository,
         private readonly StripePaymentsRepository         $stripePaymentsRepository,
-        private readonly AffiliateRepositoryInterface     $affiliateRepository,
-        private readonly ProductQuantityUpdateService     $quantityUpdateService,
         private readonly StripeRefundExpiredOrderService  $refundExpiredOrderService,
-        private readonly AttendeeRepositoryInterface      $attendeeRepository,
         private readonly DatabaseManager                  $databaseManager,
         private readonly LoggerInterface                  $logger,
         private readonly Repository                       $cache,
-        private readonly DomainEventDispatcherService     $domainEventDispatcherService,
-        private readonly OrderApplicationFeeService       $orderApplicationFeeService,
-        private readonly EventSettingsRepositoryInterface $eventSettingsRepository,
+        private readonly CompleteOnlineOrderPaymentService $completeOnlineOrderPaymentService,
     )
     {
     }
@@ -92,51 +72,14 @@ class PaymentIntentSucceededHandler
 
             $this->updateStripePaymentInfo($paymentIntent, $stripePayment);
 
-            $updatedOrder = $this->updateOrderStatuses($stripePayment);
-
-            $this->updateAttendeeStatuses($updatedOrder);
-
-            $this->quantityUpdateService->updateQuantitiesFromOrder($updatedOrder);
-
-            /** @var EventSettingDomainObject $eventSettings */
-            $eventSettings = $this->eventSettingsRepository->findFirstWhere([
-                EventSettingDomainObjectAbstract::EVENT_ID => $updatedOrder->getEventId(),
-            ]);
-
-            event(new OrderStatusChangedEvent($updatedOrder, createInvoice: $eventSettings->getEnableInvoicing()));
-
-            $this->domainEventDispatcherService->dispatch(
-                new OrderEvent(
-                    type: DomainEventType::ORDER_CREATED,
-                    orderId: $updatedOrder->getId()
-                ),
+            $updatedOrder = $this->completeOnlineOrderPaymentService->complete(
+                orderId: $stripePayment->getOrderId(),
+                paymentProvider: PaymentProviders::STRIPE,
+                applicationFeeAmountMinorUnit: $paymentIntent->application_fee_amount ?? 0,
             );
 
             $this->markPaymentIntentAsHandled($paymentIntent, $updatedOrder);
-
-            $this->storeApplicationFeePayment($updatedOrder, $paymentIntent);
         });
-    }
-
-    private function updateOrderStatuses(StripePaymentDomainObjectAbstract $stripePayment): OrderDomainObject
-    {
-        $updatedOrder = $this->orderRepository
-            ->loadRelation(OrderItemDomainObject::class)
-            ->updateFromArray($stripePayment->getOrderId(), [
-                OrderDomainObjectAbstract::PAYMENT_STATUS => OrderPaymentStatus::PAYMENT_RECEIVED->name,
-                OrderDomainObjectAbstract::STATUS => OrderStatus::COMPLETED->name,
-                OrderDomainObjectAbstract::PAYMENT_PROVIDER => PaymentProviders::STRIPE->value,
-            ]);
-
-        // Update affiliate sales if this order has an affiliate
-        if ($updatedOrder->getAffiliateId()) {
-            $this->affiliateRepository->incrementSales(
-                affiliateId: $updatedOrder->getAffiliateId(),
-                amount: $updatedOrder->getTotalGross()
-            );
-        }
-
-        return $updatedOrder;
     }
 
     private function updateStripePaymentInfo(PaymentIntent $paymentIntent, StripePaymentDomainObjectAbstract $stripePayment): void
@@ -221,19 +164,6 @@ class PaymentIntentSucceededHandler
         $this->handleExpiredOrder($stripePayment, $paymentIntent);
     }
 
-    private function updateAttendeeStatuses(OrderDomainObject $updatedOrder): void
-    {
-        $this->attendeeRepository->updateWhere(
-            attributes: [
-                'status' => AttendeeStatus::ACTIVE->name,
-            ],
-            where: [
-                'order_id' => $updatedOrder->getId(),
-                'status' => AttendeeStatus::AWAITING_PAYMENT->name,
-            ],
-        );
-    }
-
     private function markPaymentIntentAsHandled(PaymentIntent $paymentIntent, OrderDomainObject $updatedOrder): void
     {
         $this->logger->info('Stripe payment intent succeeded event handled', [
@@ -249,16 +179,5 @@ class PaymentIntentSucceededHandler
     private function isPaymentIntentAlreadyHandled(PaymentIntent $paymentIntent): bool
     {
         return $this->cache->has('payment_intent_handled_' . $paymentIntent->id);
-    }
-
-    private function storeApplicationFeePayment(OrderDomainObject $updatedOrder, PaymentIntent $paymentIntent): void
-    {
-        $this->orderApplicationFeeService->createOrderApplicationFee(
-            orderId: $updatedOrder->getId(),
-            applicationFeeAmountMinorUnit: $paymentIntent->application_fee_amount ?? 0,
-            orderApplicationFeeStatus: OrderApplicationFeeStatus::PAID,
-            paymentMethod: PaymentProviders::STRIPE,
-            currency: $updatedOrder->getCurrency(),
-        );
     }
 }

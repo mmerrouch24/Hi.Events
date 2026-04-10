@@ -1,5 +1,6 @@
 import {publicApi} from "./public-client.ts";
 import {
+    CmiPaymentRequestResponse,
     GenericDataResponse,
     GenericPaginatedResponse,
     IdParam,
@@ -10,19 +11,30 @@ import {
 import {api} from "./client.ts";
 import {queryParamsHelper} from "../utilites/queryParamsHelper.ts";
 
+export interface OrderQuestionResponse {
+    question_id: number;
+    response: Record<string, any>;
+}
+
 export interface OrderDetails {
     first_name: string,
     last_name: string,
     email: string,
+    donor_type?: 'ALUMNI' | 'COMPANY' | null,
+    email_confirmation?: string,
+    address?: Record<string, any>,
+    questions?: OrderQuestionResponse[],
+    opted_into_marketing?: boolean,
 }
 
 export interface AttendeeDetails extends OrderDetails {
     product_id: number,
+    product_price_id?: number,
 }
 
 export interface FinaliseOrderPayload {
     order: OrderDetails,
-    attendees: AttendeeDetails[],
+    products: AttendeeDetails[],
 }
 
 export interface EditOrderPayload {
@@ -151,6 +163,10 @@ export const orderClientPublic = {
             public_key: string,
             stripe_platform?: string,
         }>(`events/${eventId}/order/${orderShortId}/stripe/payment_intent`);
+        return response.data;
+    },
+    createCmiPaymentRequest: async (eventId: number, orderShortId: string) => {
+        const response = await publicApi.post<CmiPaymentRequestResponse>(`events/${eventId}/order/${orderShortId}/cmi/payment_request`);
         return response.data;
     },
 

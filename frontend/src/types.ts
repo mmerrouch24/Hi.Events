@@ -181,7 +181,28 @@ export interface Image {
 
 export type ImageType = 'EVENT_COVER' | 'EDITOR_IMAGE' | 'ORGANIZER_LOGO' | 'ORGANIZER_COVER' | 'ORGANIZER_IMAGE' | 'TICKET_LOGO';
 
-export type PaymentProvider = 'STRIPE' | 'OFFLINE';
+export type PaymentProvider = 'STRIPE' | 'CMI' | 'OFFLINE';
+
+export interface AccountCmiConfig {
+    merchant_id: string;
+    store_key?: string;
+    gateway_url: string;
+    currency_numeric_code: string;
+    language: string;
+    transaction_type: string;
+    store_type: string;
+    hash_algorithm: string;
+    auto_redirect: boolean;
+    is_enabled: boolean;
+    mode: 'test' | 'live';
+    bill_to_company?: string | null;
+    bill_to_street1?: string | null;
+    bill_to_city?: string | null;
+    bill_to_state_prov?: string | null;
+    bill_to_postal_code?: string | null;
+    bill_to_country: string;
+    is_configured?: boolean;
+}
 
 export type AttendeeDetailsCollectionMethod = 'PER_TICKET' | 'PER_ORDER';
 
@@ -677,6 +698,12 @@ export interface StripePaymentIntent {
     status: string;
     paymentIntentId: string;
     amount: number;
+}
+
+export interface CmiPaymentRequestResponse {
+    gateway_url: string;
+    oid: string;
+    fields: Record<string, string>;
 }
 
 export interface Question {

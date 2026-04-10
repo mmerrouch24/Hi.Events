@@ -376,6 +376,11 @@ export const OrdersTable = ({orders, event}: OrdersTableProps) => {
                                     <IconCreditCard size={16}/>
                                     <Text>{t`Stripe`}</Text>
                                 </>
+                            ) : order.payment_provider === 'CMI' ? (
+                                <>
+                                    <IconCreditCard size={16}/>
+                                    <Text>{t`CMI`}</Text>
+                                </>
                             ) : order.payment_provider === 'OFFLINE' ? (
                                 <>
                                     <IconCash size={16}/>

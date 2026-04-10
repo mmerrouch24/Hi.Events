@@ -20,6 +20,7 @@ import {VatSettingsModal} from './VatSettings/VatSettingsModal.tsx';
 import {VatNotice, getVatInfo} from './VatNotice';
 import {useGetAccountVatSetting} from '../../../../../../queries/useGetAccountVatSetting.ts';
 import {trackEvent, AnalyticsEvents} from "../../../../../../utilites/analytics.ts";
+import {CmiSettings} from "./CmiSettings.tsx";
 
 interface FeePlanDisplayProps {
     configuration?: {
@@ -856,6 +857,11 @@ const PaymentSettings = () => {
                                 )}
                             </Grid.Col>
                         )}
+                        <Grid.Col span={{base: 12}}>
+                            {accountQuery.data && (
+                                <CmiSettings account={accountQuery.data}/>
+                            )}
+                        </Grid.Col>
                     </Grid>
                 )}
             </Card>
