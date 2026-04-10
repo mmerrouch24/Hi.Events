@@ -25,6 +25,20 @@ interface CheckoutProductQuestionProps {
     index: number,
 }
 
+const getQuestionResponsePath = (
+    questions: Array<{question_id: number}> | Record<string, unknown> | undefined | null,
+    questionId: number,
+    fallbackPath: string,
+): string => {
+    const questionIndex = Array.isArray(questions)
+        ? questions.findIndex((question) => Number(question.question_id) === Number(questionId))
+        : -1;
+
+    return questionIndex >= 0
+        ? fallbackPath.replace('__QUESTION_INDEX__', String(questionIndex))
+        : fallbackPath.replace('__QUESTION_INDEX__', '0');
+};
+
 const DropDownInput = ({question, name, form}: QuestionInputProps) => {
     const items: ComboboxItem[] = [];
 
@@ -211,11 +225,15 @@ export const QuestionInput = ({question, name, form}: QuestionInputProps) => {
 };
 
 export const CheckoutOrderQuestions = ({questions, form}: CheckoutQuestionProps) => {
-    let questionIndex = 0;
     return (
         <>
             {questions.map((question, index) => {
-                const name = `order.questions.${questionIndex++}.response`;
+                const name = getQuestionResponsePath(
+                    form.values.order?.questions,
+                    Number(question.id),
+                    `order.questions.__QUESTION_INDEX__.response`,
+                );
+
                 return <QuestionInput key={`${index}-question`} question={question} name={name} form={form}/>
             })}
         </>
@@ -228,7 +246,6 @@ export const CheckoutProductQuestions = ({
                                              product,
                                              index: productIndex
                                          }: CheckoutProductQuestionProps) => {
-    let questionIndex = 0;
     return (
         <>
             {questions.map((question, index) => {
@@ -236,10 +253,14 @@ export const CheckoutProductQuestions = ({
                     return;
                 }
 
-                const name = `products.${productIndex}.questions.${questionIndex++}.response`;
+                const name = getQuestionResponsePath(
+                    form.values.products?.[productIndex]?.questions,
+                    Number(question.id),
+                    `products.${productIndex}.questions.__QUESTION_INDEX__.response`,
+                );
+
                 return <QuestionInput key={`${index}-product`} question={question} name={name} form={form}/>
             })}
         </>
     )
 }
-

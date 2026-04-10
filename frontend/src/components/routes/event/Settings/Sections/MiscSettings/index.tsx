@@ -1,9 +1,9 @@
 import {t} from "@lingui/macro";
-import {Button, Switch} from "@mantine/core";
+import {Button, Divider, NumberInput, Select, Switch, TextInput} from "@mantine/core";
 import {useForm} from "@mantine/form";
 import {useParams} from "react-router";
 import {useEffect} from "react";
-import {EventSettings} from "../../../../../../types.ts";
+import {EventSettings, QuestionBelongsToType} from "../../../../../../types.ts";
 import {Card} from "../../../../../common/Card";
 import {showSuccess} from "../../../../../../utilites/notifications.tsx";
 import {useFormErrorResponseHandler} from "../../../../../../hooks/useFormErrorResponseHandler.tsx";
@@ -13,16 +13,30 @@ import {HeadingWithDescription} from "../../../../../common/Card/CardHeading";
 import {CustomSelect, ItemProps} from "../../../../../common/CustomSelect";
 import {IconCoin, IconCoins} from "@tabler/icons-react";
 import {SelfServiceSettings} from "../../../../../common/SelfServiceSettings";
+import {useGetEventQuestions} from "../../../../../../queries/useGetEventQuestions.ts";
 
 export const MiscSettings = () => {
     const {eventId} = useParams();
     const eventSettingsQuery = useGetEventSettings(eventId);
+    const eventQuestionsQuery = useGetEventQuestions(eventId);
     const updateMutation = useUpdateEventSettings();
     const form = useForm({
         initialValues: {
             price_display_mode: 'EXCLUSIVE',
             hide_getting_started_page: false,
             allow_attendee_self_edit: false,
+            donations_settings: {
+                enabled: false,
+                donations_category_name: 'Donations',
+                global_goal_amount: 0,
+                table_goal_amount: 0,
+                graduation_year_question_id: null,
+                alumni_table_number_question_id: null,
+                company_name_question_id: null,
+                company_contact_phone_question_id: null,
+                company_table_number_question_id: null,
+                support_message_question_id: null,
+            },
         }
     });
     const formErrorHandle = useFormErrorResponseHandler();
@@ -33,6 +47,18 @@ export const MiscSettings = () => {
                 price_display_mode: eventSettingsQuery.data.price_display_mode,
                 hide_getting_started_page: eventSettingsQuery.data.hide_getting_started_page,
                 allow_attendee_self_edit: eventSettingsQuery.data.allow_attendee_self_edit ?? false,
+                donations_settings: {
+                    enabled: eventSettingsQuery.data.donations_settings?.enabled ?? false,
+                    donations_category_name: eventSettingsQuery.data.donations_settings?.donations_category_name || 'Donations',
+                    global_goal_amount: eventSettingsQuery.data.donations_settings?.global_goal_amount ?? 0,
+                    table_goal_amount: eventSettingsQuery.data.donations_settings?.table_goal_amount ?? 0,
+                    graduation_year_question_id: eventSettingsQuery.data.donations_settings?.graduation_year_question_id ?? null,
+                    alumni_table_number_question_id: eventSettingsQuery.data.donations_settings?.alumni_table_number_question_id ?? null,
+                    company_name_question_id: eventSettingsQuery.data.donations_settings?.company_name_question_id ?? null,
+                    company_contact_phone_question_id: eventSettingsQuery.data.donations_settings?.company_contact_phone_question_id ?? null,
+                    company_table_number_question_id: eventSettingsQuery.data.donations_settings?.company_table_number_question_id ?? null,
+                    support_message_question_id: eventSettingsQuery.data.donations_settings?.support_message_question_id ?? null,
+                },
             });
         }
     }, [eventSettingsQuery.isFetched]);
@@ -66,6 +92,12 @@ export const MiscSettings = () => {
         },
     ];
 
+    const orderQuestions = eventQuestionsQuery.data?.filter((question) => question.belongs_to === QuestionBelongsToType.ORDER) || [];
+    const questionOptions = orderQuestions.map((question) => ({
+        value: String(question.id),
+        label: `${question.title} (#${question.id})`,
+    }));
+
     return (
         <Card>
             <HeadingWithDescription
@@ -96,6 +128,105 @@ export const MiscSettings = () => {
                     <SelfServiceSettings
                         value={form.values.allow_attendee_self_edit}
                         onChange={(value) => form.setFieldValue('allow_attendee_self_edit', value)}
+                    />
+
+                    <Divider my="lg"/>
+
+                    <HeadingWithDescription
+                        heading={t`Donations Settings`}
+                        description={t`Configure the fundraising category, goals, and mapped checkout questions for donation reporting.`}
+                    />
+
+                    <Switch
+                        {...form.getInputProps('donations_settings.enabled', {type: 'checkbox'})}
+                        label={t`Enable donations mode`}
+                        description={t`When enabled, donation-category carts get the specialized gala checkout and reports.`}
+                        mb="md"
+                    />
+
+                    <TextInput
+                        {...form.getInputProps('donations_settings.donations_category_name')}
+                        label={t`Donations category name`}
+                        placeholder={t`Donations`}
+                        mb="md"
+                    />
+
+                    <NumberInput
+                        {...form.getInputProps('donations_settings.global_goal_amount')}
+                        label={t`Global donations goal`}
+                        min={0}
+                        decimalScale={2}
+                        fixedDecimalScale
+                        mb="md"
+                    />
+
+                    <NumberInput
+                        {...form.getInputProps('donations_settings.table_goal_amount')}
+                        label={t`Table goal`}
+                        min={0}
+                        decimalScale={2}
+                        fixedDecimalScale
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Graduation year question`}
+                        value={form.values.donations_settings.graduation_year_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.graduation_year_question_id', value ? Number(value) : null)}
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Alumni table number question`}
+                        value={form.values.donations_settings.alumni_table_number_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.alumni_table_number_question_id', value ? Number(value) : null)}
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Company name question`}
+                        value={form.values.donations_settings.company_name_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.company_name_question_id', value ? Number(value) : null)}
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Company contact phone question`}
+                        value={form.values.donations_settings.company_contact_phone_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.company_contact_phone_question_id', value ? Number(value) : null)}
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Company table number question`}
+                        value={form.values.donations_settings.company_table_number_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.company_table_number_question_id', value ? Number(value) : null)}
+                        mb="md"
+                    />
+
+                    <Select
+                        clearable
+                        searchable
+                        data={questionOptions}
+                        label={t`Support message question`}
+                        value={form.values.donations_settings.support_message_question_id?.toString() || null}
+                        onChange={(value) => form.setFieldValue('donations_settings.support_message_question_id', value ? Number(value) : null)}
+                        mb="md"
                     />
 
                     <Button loading={updateMutation.isPending} type={'submit'}>

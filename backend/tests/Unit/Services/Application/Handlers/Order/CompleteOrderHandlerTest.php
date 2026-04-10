@@ -21,6 +21,7 @@ use HiEvents\Services\Application\Handlers\Order\CompleteOrderHandler;
 use HiEvents\Services\Application\Handlers\Order\DTO\CompleteOrderDTO;
 use HiEvents\Services\Application\Handlers\Order\DTO\CompleteOrderOrderDTO;
 use HiEvents\Services\Application\Handlers\Order\DTO\CompleteOrderProductDataDTO;
+use HiEvents\Services\Domain\Donation\DonationCheckoutValidationService;
 use HiEvents\Services\Domain\Product\ProductQuantityUpdateService;
 use HiEvents\Services\Infrastructure\DomainEvents\DomainEventDispatcherService;
 use HiEvents\Services\Infrastructure\DomainEvents\Enums\DomainEventType;
@@ -50,6 +51,7 @@ class CompleteOrderHandlerTest extends TestCase
     private AffiliateRepositoryInterface|MockInterface $affiliateRepository;
     private EventSettingsRepositoryInterface $eventSettingsRepository;
     private CheckoutSessionManagementService|MockInterface $sessionManagementService;
+    private DonationCheckoutValidationService|MockInterface $donationCheckoutValidationService;
 
     protected function setUp(): void
     {
@@ -68,7 +70,9 @@ class CompleteOrderHandlerTest extends TestCase
         $this->affiliateRepository = Mockery::mock(AffiliateRepositoryInterface::class);
         $this->eventSettingsRepository = Mockery::mock(EventSettingsRepositoryInterface::class);
         $this->sessionManagementService = Mockery::mock(CheckoutSessionManagementService::class);
+        $this->donationCheckoutValidationService = Mockery::mock(DonationCheckoutValidationService::class);
         $this->sessionManagementService->shouldReceive('verifySession')->andReturn(true)->byDefault();
+        $this->donationCheckoutValidationService->shouldReceive('validate')->andReturnNull()->byDefault();
 
         $this->completeOrderHandler = new CompleteOrderHandler(
             $this->orderRepository,
@@ -80,6 +84,7 @@ class CompleteOrderHandlerTest extends TestCase
             $this->domainEventDispatcherService,
             $this->eventSettingsRepository,
             $this->sessionManagementService,
+            $this->donationCheckoutValidationService,
         );
     }
 

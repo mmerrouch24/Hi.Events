@@ -36,6 +36,7 @@ use HiEvents\Services\Application\Handlers\Order\DTO\CompleteOrderOrderDTO;
 use HiEvents\Services\Application\Handlers\Order\DTO\CompleteOrderProductDataDTO;
 use HiEvents\Services\Application\Handlers\Order\DTO\CreatedProductDataDTO;
 use HiEvents\Services\Application\Handlers\Order\DTO\OrderQuestionsDTO;
+use HiEvents\Services\Domain\Donation\DonationCheckoutValidationService;
 use HiEvents\Services\Domain\Payment\Stripe\EventHandlers\PaymentIntentSucceededHandler;
 use HiEvents\Services\Domain\Product\ProductQuantityUpdateService;
 use HiEvents\Services\Infrastructure\DomainEvents\DomainEventDispatcherService;
@@ -62,6 +63,7 @@ class CompleteOrderHandler
         private readonly DomainEventDispatcherService      $domainEventDispatcherService,
         private readonly EventSettingsRepositoryInterface  $eventSettingsRepository,
         private readonly CheckoutSessionManagementService  $sessionManagementService,
+        private readonly DonationCheckoutValidationService $donationCheckoutValidationService,
     )
     {
     }
@@ -80,6 +82,8 @@ class CompleteOrderHandler
             $orderDTO = $orderData->order;
 
             $order = $this->getOrder($orderShortId);
+
+            $this->donationCheckoutValidationService->validate($order, $eventSettings, $orderData);
 
             $updatedOrder = $this->updateOrder($order, $orderDTO);
 
@@ -318,6 +322,12 @@ class CompleteOrderHandler
                     OrderDomainObjectAbstract::PAYMENT_STATUS => $order->isPaymentRequired()
                         ? OrderPaymentStatus::AWAITING_PAYMENT->name
                         : OrderPaymentStatus::NO_PAYMENT_REQUIRED->name,
+                    OrderDomainObjectAbstract::POINT_IN_TIME_DATA => $orderDTO->donor_type
+                        ? array_merge(
+                            is_array($order->getPointInTimeData()) ? $order->getPointInTimeData() : [],
+                            ['donations' => ['donor_type' => $orderDTO->donor_type]]
+                        )
+                        : $order->getPointInTimeData(),
                     OrderDomainObjectAbstract::STATUS => $order->isPaymentRequired()
                         ? OrderStatus::RESERVED->name
                         : OrderStatus::COMPLETED->name,

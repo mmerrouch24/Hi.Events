@@ -29,6 +29,12 @@ const Reports = () => {
             title: t`Promo Codes Report`,
             description: t`Promo code usage and discount breakdown`,
             icon: <Avatar size={40} color={'#634fc0'}><IconReportMoney/></Avatar>
+        },
+        {
+            id: ReportTypes.Donations,
+            title: t`Donations Report`,
+            description: t`Fundraising progress, donor tables, classes, and messages`,
+            icon: <Avatar size={40} color={'#0f766e'}><IconChartBar/></Avatar>
         }
     ];
 

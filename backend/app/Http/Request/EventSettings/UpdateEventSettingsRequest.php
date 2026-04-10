@@ -99,6 +99,19 @@ class UpdateEventSettingsRequest extends BaseRequest
             'homepage_theme_settings.mode' => ['nullable', 'string', Rule::in(['light', 'dark'])],
             'homepage_theme_settings.background_type' => ['nullable', 'string', Rule::in(HomepageBackgroundType::valuesArray())],
 
+            // Donations settings
+            'donations_settings' => ['nullable', 'array'],
+            'donations_settings.enabled' => ['boolean'],
+            'donations_settings.donations_category_name' => ['nullable', 'string', 'max:255'],
+            'donations_settings.global_goal_amount' => ['nullable', 'numeric', 'min:0'],
+            'donations_settings.table_goal_amount' => ['nullable', 'numeric', 'min:0'],
+            'donations_settings.graduation_year_question_id' => ['nullable', 'integer'],
+            'donations_settings.alumni_table_number_question_id' => ['nullable', 'integer'],
+            'donations_settings.company_name_question_id' => ['nullable', 'integer'],
+            'donations_settings.company_contact_phone_question_id' => ['nullable', 'integer'],
+            'donations_settings.company_table_number_question_id' => ['nullable', 'integer'],
+            'donations_settings.support_message_question_id' => ['nullable', 'integer'],
+
             // Self-service settings
             'allow_attendee_self_edit' => ['boolean'],
 

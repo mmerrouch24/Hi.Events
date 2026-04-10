@@ -1,6 +1,7 @@
 import {api} from "./client";
 import {
     CheckInStats,
+    DonationsReport,
     Event,
     EventDuplicatePayload,
     EventStats,
@@ -88,6 +89,11 @@ export const eventsClient = {
 
     getEventReport: async (eventId: IdParam, reportType: IdParam, startDate?: string, endDate?: string) => {
         const response = await api.get<GenericDataResponse<any>>('events/' + eventId + '/reports/' + reportType + '?start_date=' + startDate + '&end_date=' + endDate);
+        return response.data;
+    },
+
+    getDonationsReport: async (eventId: IdParam) => {
+        const response = await api.get<GenericDataResponse<DonationsReport>>(`events/${eventId}/donations-report`);
         return response.data;
     }
 }

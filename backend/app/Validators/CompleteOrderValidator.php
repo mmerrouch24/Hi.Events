@@ -15,9 +15,12 @@ use HiEvents\Repository\Eloquent\Value\Relationship;
 use HiEvents\Repository\Interfaces\EventSettingsRepositoryInterface;
 use HiEvents\Repository\Interfaces\ProductRepositoryInterface;
 use HiEvents\Repository\Interfaces\QuestionRepositoryInterface;
+use HiEvents\Services\Domain\Donation\DonationSettingsService;
 use HiEvents\Validators\Rules\OrderQuestionRule;
 use HiEvents\Validators\Rules\ProductQuestionRule;
 use Illuminate\Routing\Route;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 class CompleteOrderValidator extends BaseValidator
 {
@@ -25,6 +28,7 @@ class CompleteOrderValidator extends BaseValidator
         private readonly QuestionRepositoryInterface      $questionRepository,
         private readonly ProductRepositoryInterface       $productRepository,
         private readonly EventSettingsRepositoryInterface $eventSettingsRepository,
+        private readonly DonationSettingsService          $donationSettingsService,
         private readonly Route                            $route
     )
     {
@@ -61,6 +65,24 @@ class CompleteOrderValidator extends BaseValidator
             'event_id' => $this->route->parameter('event_id'),
         ]);
 
+        $productIds = collect($this->data['products'] ?? [])
+            ->pluck('product_id')
+            ->filter()
+            ->map(fn($id) => (int)$id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $isDonationOrder = $this->donationSettingsService->isDonationOrder(
+            (int)$this->route->parameter('event_id'),
+            $productIds,
+            $eventSettings,
+        );
+
+        $orderQuestionsRule = $isDonationOrder
+            ? ['nullable', 'array']
+            : new OrderQuestionRule($orderQuestions, $products);
+
         $addressRules = $eventSettings->getRequireBillingAddress() ? [
             'order.address' => 'array',
             'order.address.address_line_1' => 'required|string|max:255',
@@ -74,9 +96,10 @@ class CompleteOrderValidator extends BaseValidator
         return [
             'order.first_name' => ['required', 'string', 'max:40'],
             'order.last_name' => ['required', 'string', 'max:40'],
-            'order.questions' => new OrderQuestionRule($orderQuestions, $products),
+            'order.questions' => $orderQuestionsRule,
             'order.email' => 'required|email',
             'order.email_confirmation' => 'required|email|same:order.email',
+            'order.donor_type' => ['nullable', 'string', Rule::in(['ALUMNI', 'COMPANY'])],
             'products' => new ProductQuestionRule(
                 $productQuestions,
                 $products,

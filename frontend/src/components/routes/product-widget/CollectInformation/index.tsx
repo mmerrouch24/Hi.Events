@@ -19,7 +19,7 @@ import {useGetOrderPublic} from "../../../../queries/useGetOrderPublic.ts";
 import {useGetEventPublic} from "../../../../queries/useGetEventPublic.ts";
 import {useGetEventQuestionsPublic} from "../../../../queries/useGetEventQuestionsPublic.ts";
 import {CheckoutOrderQuestions, CheckoutProductQuestions} from "../../../common/CheckoutQuestion";
-import {Event, IdParam, Question} from "../../../../types.ts";
+import {DonationDonorType, Event, IdParam, Question} from "../../../../types.ts";
 import {useEffect, useState} from "react";
 import {InputGroup} from "../../../common/InputGroup";
 import {Card} from "../../../common/Card";
@@ -90,6 +90,7 @@ export const CollectInformation = () => {
                 last_name: "",
                 email: "",
                 email_confirmation: "",
+                donor_type: "ALUMNI" as DonationDonorType,
                 address: {},
                 questions: {},
                 opted_into_marketing: false,
@@ -108,6 +109,23 @@ export const CollectInformation = () => {
             order: {
                 email_confirmation: (value, values) =>
                     value !== values.order.email ? t`Email addresses do not match` : null,
+                donor_type: (value, values) => {
+                    const donationsCategoryName = event?.settings?.donations_settings?.donations_category_name;
+                    const donationProductIds = new Set(
+                        productCategories
+                            ?.filter((category) => category.name === donationsCategoryName)
+                            .flatMap((category) => category.products?.map((product) => product.id) || []) || []
+                    );
+                    const donationCheckout = !!event?.settings?.donations_settings?.enabled
+                        && orderItems?.length
+                        && orderItems.every((item) => donationProductIds.has(item.product_id));
+
+                    if (donationCheckout && !value) {
+                        return t`Please choose the donor type`;
+                    }
+
+                    return null;
+                }
             },
             products: {
                 email_confirmation: (value, values, path) => {
@@ -220,6 +238,7 @@ export const CollectInformation = () => {
         },
 
         onError: (error: any) => {
+            console.error('CollectInformation finaliseOrder error', error?.response?.data ?? error);
             if (error?.response?.data?.errors && Object.keys(error?.response?.data?.errors).length > 0) {
                 form.setErrors(error.response.data.errors);
             } else if (error?.response?.data?.message) {
@@ -288,10 +307,6 @@ export const CollectInformation = () => {
 
         return formOrderQuestions;
     }
-
-    const handleSubmit = (values: any) => {
-        mutation.mutate(values);
-    };
 
     useEffect(() => {
         if (isEventFetched && isOrderFetched && isQuestionsFetched && productQuestions && orderQuestions) {
@@ -389,6 +404,92 @@ export const CollectInformation = () => {
         return product?.product_type === 'TICKET';
     });
 
+    const donationSettings = event?.settings?.donations_settings;
+    const donationsCategoryName = donationSettings?.donations_category_name;
+    const donationProductIds = new Set(
+        productCategories
+            ?.filter((category) => category.name === donationsCategoryName)
+            .flatMap((category) => category.products?.map((product) => Number(product.id)) || []) || []
+    );
+    const isDonationCheckout = !!donationSettings?.enabled
+        && !!orderItems?.length
+        && orderItems.every((item) => donationProductIds.has(Number(item.product_id)));
+    const donorType = form.values.order.donor_type;
+    const mappedQuestionIds = new Set([
+        donationSettings?.graduation_year_question_id,
+        donationSettings?.alumni_table_number_question_id,
+        donationSettings?.company_name_question_id,
+        donationSettings?.company_contact_phone_question_id,
+        donationSettings?.company_table_number_question_id,
+        donationSettings?.support_message_question_id,
+    ].filter(Boolean));
+    const visibleDonationQuestionIds = new Set([
+        donorType === 'ALUMNI' ? donationSettings?.graduation_year_question_id : null,
+        donorType === 'ALUMNI' ? donationSettings?.alumni_table_number_question_id : null,
+        donorType === 'COMPANY' ? donationSettings?.company_name_question_id : null,
+        donorType === 'COMPANY' ? donationSettings?.company_contact_phone_question_id : null,
+        donorType === 'COMPANY' ? donationSettings?.company_table_number_question_id : null,
+        donationSettings?.support_message_question_id,
+    ].filter(Boolean));
+    const visibleOrderQuestions = orderQuestions?.filter((question) => {
+        if (!isDonationCheckout) {
+            return true;
+        }
+
+        if (!mappedQuestionIds.has(question.id)) {
+            return true;
+        }
+
+        return visibleDonationQuestionIds.has(question.id);
+    });
+    const buyerFirstNameLabel = isDonationCheckout && donorType === 'COMPANY' ? t`Contact First Name` : t`First Name`;
+    const buyerLastNameLabel = isDonationCheckout && donorType === 'COMPANY' ? t`Contact Last Name` : t`Last Name`;
+    const buyerEmailLabel = isDonationCheckout && donorType === 'COMPANY' ? t`Contact Email Address` : t`Email Address`;
+    const confirmBuyerEmailLabel = isDonationCheckout && donorType === 'COMPANY' ? t`Confirm Contact Email Address` : t`Confirm Email Address`;
+
+    const handleSubmit = (values: any) => {
+        if (!isDonationCheckout) {
+            mutation.mutate(values);
+            return;
+        }
+
+        const normalizedOrderQuestions = Array.isArray(values.order?.questions)
+            ? values.order.questions.map((question: {question_id: number; response?: any}) => {
+                const questionId = Number(question.question_id);
+                const isHiddenDonationQuestion = mappedQuestionIds.has(questionId)
+                    && !visibleDonationQuestionIds.has(questionId);
+
+                if (!isHiddenDonationQuestion) {
+                    return question;
+                }
+
+                const answer = question?.response?.answer ?? question?.response;
+                const hasAnswer = Array.isArray(answer)
+                    ? answer.length > 0
+                    : typeof answer === 'object' && answer !== null
+                        ? Object.keys(answer).length > 0
+                        : answer !== undefined && answer !== null && String(answer).trim() !== '';
+
+                if (hasAnswer) {
+                    return question;
+                }
+
+                return {
+                    ...question,
+                    response: {answer: 'N/A'},
+                };
+            })
+            : values.order?.questions;
+
+        mutation.mutate({
+            ...values,
+            order: {
+                ...values.order,
+                questions: normalizedOrderQuestions,
+            },
+        });
+    };
+
     return (
         <form onSubmit={form.onSubmit(handleSubmit)}>
 
@@ -417,21 +518,41 @@ export const CollectInformation = () => {
                     {t`Your Details`}
                 </h2>
                 <p className={classes.sectionHelper}>
-                    {t`We'll send your tickets to this email`}
+                    {isDonationCheckout ? t`We'll send your donation confirmation to this email` : t`We'll send your tickets to this email`}
                 </p>
 
                 <Card>
+                    {isDonationCheckout && (
+                        <>
+                            <SegmentedControl
+                                fullWidth
+                                mb="md"
+                                value={form.values.order.donor_type}
+                                onChange={(value) => form.setFieldValue('order.donor_type', value as DonationDonorType)}
+                                data={[
+                                    {label: t`Alumni`, value: 'ALUMNI'},
+                                    {label: t`Company`, value: 'COMPANY'},
+                                ]}
+                            />
+                            <Text size="sm" c="dimmed" mb="md">
+                                {t`Choose the donor type to show the right fundraising details and payment options.`}
+                            </Text>
+                            {form.errors["order.donor_type"] && (
+                                <Text c="red" size="sm" mb="md">{String(form.errors["order.donor_type"])}</Text>
+                            )}
+                        </>
+                    )}
                     <InputGroup>
                         <TextInput
                             withAsterisk
-                            label={t`First Name`}
-                            placeholder={t`First name`}
+                            label={buyerFirstNameLabel}
+                            placeholder={buyerFirstNameLabel}
                             {...form.getInputProps("order.first_name")}
                         />
                         <TextInput
                             withAsterisk
-                            label={t`Last Name`}
-                            placeholder={t`Last Name`}
+                            label={buyerLastNameLabel}
+                            placeholder={buyerLastNameLabel}
                             {...form.getInputProps("order.last_name")}
                         />
                     </InputGroup>
@@ -440,16 +561,16 @@ export const CollectInformation = () => {
                         <TextInput
                             withAsterisk
                             type={"email"}
-                            label={t`Email Address`}
-                            placeholder={t`Email Address`}
+                            label={buyerEmailLabel}
+                            placeholder={buyerEmailLabel}
                             rightSection={isEmailValid(form.values.order.email) ? <EmailCheckIcon/> : null}
                             {...form.getInputProps("order.email")}
                         />
                         <TextInput
                             withAsterisk
                             type={"email"}
-                            label={t`Confirm Email Address`}
-                            placeholder={t`Confirm Email Address`}
+                            label={confirmBuyerEmailLabel}
+                            placeholder={confirmBuyerEmailLabel}
                             rightSection={isEmailValid(form.values.order.email_confirmation) ? <EmailCheckIcon/> : null}
                             {...form.getInputProps("order.email_confirmation")}
                         />
@@ -552,7 +673,7 @@ export const CollectInformation = () => {
                         </>
                     )}
 
-                    {orderQuestions && <CheckoutOrderQuestions form={form} questions={orderQuestions}/>}
+                    {visibleOrderQuestions && <CheckoutOrderQuestions form={form} questions={visibleOrderQuestions}/>}
 
                     {event?.settings?.show_marketing_opt_in && (
                         <Checkbox

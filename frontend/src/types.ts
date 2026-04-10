@@ -182,6 +182,20 @@ export interface Image {
 export type ImageType = 'EVENT_COVER' | 'EDITOR_IMAGE' | 'ORGANIZER_LOGO' | 'ORGANIZER_COVER' | 'ORGANIZER_IMAGE' | 'TICKET_LOGO';
 
 export type PaymentProvider = 'STRIPE' | 'CMI' | 'OFFLINE';
+export type DonationDonorType = 'ALUMNI' | 'COMPANY';
+
+export interface DonationsSettings {
+    enabled?: boolean;
+    donations_category_name?: string;
+    global_goal_amount?: number | null;
+    table_goal_amount?: number | null;
+    graduation_year_question_id?: number | null;
+    alumni_table_number_question_id?: number | null;
+    company_name_question_id?: number | null;
+    company_contact_phone_question_id?: number | null;
+    company_table_number_question_id?: number | null;
+    support_message_question_id?: number | null;
+}
 
 export interface AccountCmiConfig {
     merchant_id: string;
@@ -272,6 +286,7 @@ export interface EventSettings {
 
     // Simplified homepage theme settings (new 2-color + mode system)
     homepage_theme_settings?: HomepageThemeSettings;
+    donations_settings?: DonationsSettings;
 
     // Waitlist settings
     waitlist_auto_process?: boolean;
@@ -672,6 +687,7 @@ export interface Order {
     event?: Event;
     latest_invoice?: Invoice;
     session_identifier?: string;
+    point_in_time_data?: Record<string, any>;
 }
 
 export interface Invoice {
@@ -944,6 +960,43 @@ export enum ReportTypes {
     ProductSales = 'product_sales',
     DailySales = 'daily_sales_report',
     PromoCodes = 'promo_codes_report',
+    Donations = 'donations_report',
+}
+
+export interface DonationsReportSummary {
+    goal_amount: number;
+    table_goal_amount: number;
+    total_amount: number;
+    progress_percentage: number | null;
+    donation_count: number;
+    completed_amount: number;
+    offline_pending_amount: number;
+}
+
+export interface DonationsByGraduationYear {
+    graduation_year: string;
+    donation_count: number;
+    total_amount: number;
+}
+
+export interface DonationsByTable {
+    table_number: string;
+    donation_count: number;
+    total_amount: number;
+    completion_percentage: number | null;
+}
+
+export interface DonationMessage {
+    message: string;
+    donor_type: DonationDonorType;
+}
+
+export interface DonationsReport {
+    summary: DonationsReportSummary;
+    by_graduation_year: DonationsByGraduationYear[];
+    by_table: DonationsByTable[];
+    messages: DonationMessage[];
+    updated_at: string;
 }
 
 export enum OrganizerReportTypes {

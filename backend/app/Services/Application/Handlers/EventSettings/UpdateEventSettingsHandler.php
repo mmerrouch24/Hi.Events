@@ -5,6 +5,7 @@ namespace HiEvents\Services\Application\Handlers\EventSettings;
 use HiEvents\DomainObjects\EventSettingDomainObject;
 use HiEvents\Repository\Interfaces\EventSettingsRepositoryInterface;
 use HiEvents\Services\Application\Handlers\EventSettings\DTO\UpdateEventSettingsDTO;
+use HiEvents\Services\Domain\Donation\DonationSettingsService;
 use HiEvents\Services\Infrastructure\HtmlPurifier\HtmlPurifierService;
 use Illuminate\Database\DatabaseManager;
 use Throwable;
@@ -15,6 +16,7 @@ class UpdateEventSettingsHandler
         private readonly EventSettingsRepositoryInterface $eventSettingsRepository,
         private readonly HtmlPurifierService              $purifier,
         private readonly DatabaseManager                  $databaseManager,
+        private readonly DonationSettingsService          $donationSettingsService,
     )
     {
     }
@@ -24,6 +26,11 @@ class UpdateEventSettingsHandler
      */
     public function handle(UpdateEventSettingsDTO $settings): EventSettingDomainObject
     {
+        $this->donationSettingsService->validateDonationSettings(
+            eventId: $settings->event_id,
+            settings: $settings->donations_settings,
+        );
+
         return $this->databaseManager->transaction(function () use ($settings) {
             $this->eventSettingsRepository->updateWhere(
                 attributes: [
@@ -86,6 +93,7 @@ class UpdateEventSettingsHandler
 
                     // Homepage theme settings
                     'homepage_theme_settings' => $settings->homepage_theme_settings,
+                    'donations_settings' => $settings->donations_settings,
 
                     // Self-service settings
                     'allow_attendee_self_edit' => $settings->allow_attendee_self_edit,

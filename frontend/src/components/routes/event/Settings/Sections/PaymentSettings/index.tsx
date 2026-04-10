@@ -86,6 +86,11 @@ export const PaymentAndInvoicingSettings = () => {
             description: t`Accept credit card payments with Stripe`
         },
         {
+            value: "CMI",
+            label: t`CMI`,
+            description: t`Accept hosted online card payments with CMI`
+        },
+        {
             value: "OFFLINE",
             label: t`Offline Payments`,
             description: t`Accept bank transfers, checks, or other offline payment methods`

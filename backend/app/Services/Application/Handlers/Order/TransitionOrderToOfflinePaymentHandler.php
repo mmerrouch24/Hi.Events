@@ -15,6 +15,7 @@ use HiEvents\Exceptions\UnauthorizedException;
 use HiEvents\Repository\Interfaces\EventSettingsRepositoryInterface;
 use HiEvents\Repository\Interfaces\OrderRepositoryInterface;
 use HiEvents\Services\Application\Handlers\Order\DTO\TransitionOrderToOfflinePaymentPublicDTO;
+use HiEvents\Services\Domain\Donation\DonationSettingsService;
 use HiEvents\Services\Domain\Product\ProductQuantityUpdateService;
 use HiEvents\Services\Infrastructure\DomainEvents\DomainEventDispatcherService;
 use HiEvents\Services\Infrastructure\DomainEvents\Enums\DomainEventType;
@@ -31,6 +32,7 @@ class TransitionOrderToOfflinePaymentHandler
         private readonly EventSettingsRepositoryInterface $eventSettingsRepository,
         private readonly DomainEventDispatcherService     $domainEventDispatcherService,
         private readonly CheckoutSessionManagementService $sessionManagementService,
+        private readonly DonationSettingsService          $donationSettingsService,
     )
     {
     }
@@ -114,6 +116,16 @@ class TransitionOrderToOfflinePaymentHandler
 
         if (collect($settings->getPaymentProviders())->contains(PaymentProviders::OFFLINE->value) === false) {
             throw new UnauthorizedException(__('Offline payments are not enabled for this event'));
+        }
+
+        $productIds = $order->getOrderItems()?->pluck('product_id')->all() ?? [];
+        if ($this->donationSettingsService->isDonationOrder($order->getEventId(), $productIds, $settings)) {
+            $donorType = $this->donationSettingsService->getDonorTypeFromPointInTimeData($order->getPointInTimeData());
+            $allowedProviders = $this->donationSettingsService->getAllowedPaymentProvidersForDonorType($donorType);
+
+            if (!in_array(PaymentProviders::OFFLINE->value, $allowedProviders, true)) {
+                throw new UnauthorizedException(__('Offline payment is only available for company donation pledges.'));
+            }
         }
     }
 }
