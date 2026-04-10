@@ -42,13 +42,13 @@ class UpdateOrganizerEmailTemplateAction extends BaseEmailTemplateAction
         try {
             $cta = [
                 'label' => $validated['ctaLabel'],
-                'url_token' => 'order.url', // This will be determined by template type during update
+                'url_token' => 'order.url',
             ];
             
             $template = $this->handler->handle(
                 new UpsertEmailTemplateDTO(
                     account_id: $this->getAuthenticatedAccountId(),
-                    template_type: EmailTemplateType::ORDER_CONFIRMATION, // This will be ignored in update
+                    template_type: EmailTemplateType::ORDER_CONFIRMATION,
                     subject: $validated['subject'],
                     body: $validated['body'],
                     organizer_id: $organizerId,

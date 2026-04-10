@@ -3,6 +3,7 @@
 namespace HiEvents\Services\Application\Handlers\EmailTemplate;
 
 use HiEvents\DomainObjects\EmailTemplateDomainObject;
+use HiEvents\DomainObjects\Enums\EmailTemplateType;
 use HiEvents\Exceptions\EmailTemplateNotFoundException;
 use HiEvents\Exceptions\EmailTemplateValidationException;
 use HiEvents\Exceptions\InvalidEmailTemplateException;
@@ -45,10 +46,19 @@ class UpdateEmailTemplateHandler
             throw new EmailTemplateNotFoundException('Email template not found');
         }
 
+        $cta = $dto->cta;
+
+        if (is_array($cta) && isset($cta['label'])) {
+            $cta['url_token'] = match (EmailTemplateType::from($template->getTemplateType())) {
+                EmailTemplateType::ORDER_CONFIRMATION => 'order.url',
+                EmailTemplateType::ATTENDEE_TICKET => 'ticket.url',
+            };
+        }
+
         return $this->emailTemplateRepository->updateFromArray($template->getId(), [
             'subject' => $dto->subject,
             'body' => $dto->body,
-            'cta' => $dto->cta,
+            'cta' => $cta,
             'engine' => $dto->engine->value,
             'is_active' => $dto->is_active,
         ]);
