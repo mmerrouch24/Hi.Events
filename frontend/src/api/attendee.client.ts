@@ -63,6 +63,9 @@ export const attendeesClient = {
 
         return new Blob([response.data]);
     },
+    resendAllTickets: async (eventId: IdParam) => {
+        return await api.post(`events/${eventId}/attendees/resend-tickets`);
+    },
     resendTicket: async (eventId: IdParam, attendeeId: IdParam) => {
         return await api.post(`events/${eventId}/attendees/${attendeeId}/resend-ticket`);
     },

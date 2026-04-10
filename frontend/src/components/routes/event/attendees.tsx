@@ -6,7 +6,7 @@ import {AttendeeTable} from "../../common/AttendeeTable";
 import {SearchBarWrapper} from "../../common/SearchBar";
 import {Pagination} from "../../common/Pagination";
 import {Button} from "@mantine/core";
-import {IconDownload, IconPlus} from "@tabler/icons-react";
+import {IconDownload, IconMailForward, IconPlus} from "@tabler/icons-react";
 import {ToolBar} from "../../common/ToolBar";
 import {TableSkeleton} from "../../common/TableSkeleton";
 import {useFilterQueryParamSync} from "../../../hooks/useFilterQueryParamSync.ts";
@@ -21,6 +21,9 @@ import {withLoadingNotification} from "../../../utilites/withLoadingNotification
 import {FilterModal, FilterOption} from "../../common/FilterModal";
 import {useGetEvent} from "../../../queries/useGetEvent.ts";
 import {getProductsFromEvent} from "../../../utilites/helpers.ts";
+import {confirmationDialog} from "../../../utilites/confirmationDialog.tsx";
+import {useResendAllAttendeeTickets} from "../../../mutations/useResendAllAttendeeTickets.ts";
+import {showError, showSuccess} from "../../../utilites/notifications.tsx";
 
 const attendeeStatuses = [
     {label: t`Active`, value: 'ACTIVE'},
@@ -37,6 +40,7 @@ const Attendees = () => {
     const [createModalOpen, {open: openCreateModal, close: closeCreateModal}] = useDisclosure(false);
     const [downloadPending, setDownloadPending] = useState(false);
     const {data: event} = useGetEvent(eventId);
+    const resendAllTicketsMutation = useResendAllAttendeeTickets();
 
     const productOptions = getProductsFromEvent(event)
         ?.filter(product => product.product_type === ProductType.Ticket)
@@ -164,6 +168,21 @@ const Attendees = () => {
         status: getFilterValue(searchParams.filterFields?.status)
     };
 
+    const handleResendAllTickets = () => {
+        confirmationDialog(
+            t`Resend ticket emails to all active attendees for this event?`,
+            () => {
+                resendAllTicketsMutation.mutate({eventId}, {
+                    onSuccess: () => showSuccess(t`Ticket emails have been queued for all active attendees`),
+                    onError: (error: any) => showError(error?.response?.data?.message || t`Failed to queue ticket emails`),
+                });
+            },
+            {
+                confirm: t`Resend ticket emails`,
+            }
+        );
+    };
+
     return (
         <>
             <PageBody>
@@ -194,6 +213,16 @@ const Attendees = () => {
                 >
                     <Button color={'green'} size={'sm'} onClick={openCreateModal} rightSection={<IconPlus/>}>
                         {t`Create`}
+                    </Button>
+
+                    <Button
+                        color={'green'}
+                        size={'sm'}
+                        loading={resendAllTicketsMutation.isPending}
+                        onClick={handleResendAllTickets}
+                        rightSection={<IconMailForward/>}
+                    >
+                        {t`Resend ticket emails`}
                     </Button>
 
                     <Button color={'green'}

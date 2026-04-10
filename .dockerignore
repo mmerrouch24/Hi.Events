@@ -8,6 +8,25 @@
 **/*.njsproj
 **/*.sln
 **/*.sw?
+**/.git
+**/.github
+**/node_modules
+**/vendor
+**/dist
+**/build
+**/.cache
+**/.turbo
+**/coverage
+**/storage/logs
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/bootstrap/cache/*.php
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+CMI
+scripts
 misc
 
 fly.toml
