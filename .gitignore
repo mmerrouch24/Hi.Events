@@ -20,3 +20,10 @@ prompts/
 
 /plans/**
 /plans
+backend/lang/scribe.php
+.vscode
+backend/.scribe
+backend/public/docs
+backend/resources/views/vendor/scribe
+CMI
+scripts
