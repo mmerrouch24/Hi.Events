@@ -83,6 +83,7 @@ class CreateProductService
             'description' => $this->purifier->purify($productsData->getDescription()),
             'start_collapsed' => $productsData->getStartCollapsed(),
             'min_per_order' => $productsData->getMinPerOrder(),
+            'min_per_order_linked_ticket_product_id' => $productsData->getMinPerOrderLinkedTicketProductId(),
             'is_hidden' => $productsData->getIsHidden(),
             'hide_before_sale_start_date' => $productsData->getHideBeforeSaleStartDate(),
             'hide_after_sale_end_date' => $productsData->getHideAfterSaleEndDate(),

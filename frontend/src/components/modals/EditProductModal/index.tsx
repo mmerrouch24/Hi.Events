@@ -25,6 +25,7 @@ export const EditProductModal = ({onClose, productId}: GenericModalProps & { pro
             description: '',
             max_per_order: 100,
             min_per_order: 1,
+            min_per_order_linked_ticket_product_id: undefined,
             sale_start_date: undefined,
             sale_end_date: undefined,
             hide_before_sale_start_date: undefined,
@@ -57,6 +58,9 @@ export const EditProductModal = ({onClose, productId}: GenericModalProps & { pro
             description: product.description,
             max_per_order: product.max_per_order ?? 0,
             min_per_order: product.min_per_order ?? 0,
+            min_per_order_linked_ticket_product_id: product.min_per_order_linked_ticket_product_id
+                ? String(product.min_per_order_linked_ticket_product_id)
+                : undefined,
             sale_start_date: utcToTz(product.sale_start_date, event.timezone),
             sale_end_date: utcToTz(product.sale_end_date, event.timezone),
             hide_before_sale_start_date: product.hide_before_sale_start_date,

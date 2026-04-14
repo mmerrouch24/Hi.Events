@@ -557,6 +557,7 @@ export interface Product {
     sale_end_date?: string | Date;
     max_per_order?: number;
     min_per_order?: number;
+    min_per_order_linked_ticket_product_id?: IdParam;
     hide_before_sale_start_date?: boolean;
     hide_after_sale_end_date?: boolean;
     hide_when_sold_out?: boolean;

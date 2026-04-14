@@ -24,6 +24,7 @@ export const CreateProductModal = ({onClose, selectedCategoryId = undefined}: Cr
             description: '',
             max_per_order: 100,
             min_per_order: 1,
+            min_per_order_linked_ticket_product_id: undefined,
             sale_start_date: '',
             sale_end_date: '',
             start_collapsed: false,

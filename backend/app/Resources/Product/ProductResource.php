@@ -34,6 +34,7 @@ class ProductResource extends JsonResource
             ),
             'max_per_order' => $this->getMaxPerOrder() ?? self::DEFAULT_MAX_PRODUCTS,
             'min_per_order' => $this->getMinPerOrder() ?? self::DEFAULT_MIN_PRODUCTS,
+            'min_per_order_linked_ticket_product_id' => $this->getMinPerOrderLinkedTicketProductId(),
             'quantity_sold' => $this->getQuantitySold(),
             'sale_start_date' => $this->getSaleStartDate(),
             'sale_end_date' => $this->getSaleEndDate(),

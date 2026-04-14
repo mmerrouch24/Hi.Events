@@ -83,6 +83,7 @@ const SelectProducts = (props: SelectProductsProps) => {
     const navigate = useNavigate();
 
     const promoRef = useRef<HTMLInputElement>(null);
+    const previousEffectiveMinsRef = useRef<Map<number, number>>(new Map());
     const [showPromoCodeInput, setShowPromoCodeInput] = useInputState<boolean>(false);
     const [event, setEvent] = useState(props.event);
     const [orderInProcessOverlayVisible, setOrderInProcessOverlayVisible] = useState(false);
@@ -210,6 +211,31 @@ const SelectProducts = (props: SelectProductsProps) => {
         return total;
     }, [form.values.products]);
 
+    const selectedQuantitiesByProductId = useMemo(() => {
+        return new Map(
+            (form.values.products ?? []).map(({product_id, quantities}) => [
+                Number(product_id),
+                quantities?.reduce((sum, {quantity}) => sum + Number(quantity), 0) ?? 0,
+            ])
+        );
+    }, [form.values.products]);
+
+    const getEffectiveMinPerOrder = (product: Product) => {
+        const fixedMin = Number(product.min_per_order ?? 0);
+        const linkedTicketProductId = product.min_per_order_linked_ticket_product_id
+            ? Number(product.min_per_order_linked_ticket_product_id)
+            : null;
+
+        if (!linkedTicketProductId) {
+            return fixedMin;
+        }
+
+        return Math.max(
+            fixedMin,
+            selectedQuantitiesByProductId.get(linkedTicketProductId) ?? 0,
+        );
+    };
+
     useEffect(() => {
         if (form.values.promo_code) {
             const promo_code = form.values.promo_code;
@@ -264,6 +290,70 @@ const SelectProducts = (props: SelectProductsProps) => {
     };
 
     useEffect(populateFormValue, [productCategories]);
+
+    useEffect(() => {
+        if (!form.values.products?.length) {
+            return;
+        }
+
+        let changed = false;
+
+        const nextProducts = form.values.products.map((selectedProduct) => {
+            const product = products.find(({id}) => Number(id) === Number(selectedProduct.product_id));
+
+            if (!product) {
+                return selectedProduct;
+            }
+
+            const effectiveMinPerOrder = getEffectiveMinPerOrder(product);
+            const previousEffectiveMinPerOrder = previousEffectiveMinsRef.current.get(Number(product.id)) ?? effectiveMinPerOrder;
+            const totalSelectedQuantity = selectedProduct.quantities?.reduce(
+                (sum, {quantity}) => sum + Number(quantity),
+                0,
+            ) ?? 0;
+
+            if (effectiveMinPerOrder <= 0 || totalSelectedQuantity === 0 || totalSelectedQuantity >= effectiveMinPerOrder) {
+                return selectedProduct;
+            }
+
+            const quantities = [...(selectedProduct.quantities ?? [])];
+            if (effectiveMinPerOrder > previousEffectiveMinPerOrder) {
+                const targetQuantityIndex = quantities.findIndex(({quantity}) => Number(quantity) > 0);
+                const quantityIndexToAdjust = targetQuantityIndex >= 0 ? targetQuantityIndex : 0;
+
+                if (!quantities[quantityIndexToAdjust]) {
+                    return selectedProduct;
+                }
+
+                quantities[quantityIndexToAdjust] = {
+                    ...quantities[quantityIndexToAdjust],
+                    quantity: Number(quantities[quantityIndexToAdjust].quantity) + (effectiveMinPerOrder - totalSelectedQuantity),
+                };
+            } else {
+                quantities.forEach((quantity, index) => {
+                    quantities[index] = {
+                        ...quantity,
+                        quantity: 0,
+                    };
+                });
+            }
+
+            changed = true;
+
+            return {
+                ...selectedProduct,
+                quantities,
+            };
+        });
+
+        if (changed) {
+            form.setFieldValue('products', nextProducts);
+        }
+
+        previousEffectiveMinsRef.current = new Map(
+            products.map((product) => [Number(product.id), getEffectiveMinPerOrder(product)])
+        );
+    }, [form, form.values.products, products, selectedQuantitiesByProductId]);
 
     const handleProductSelection = (values: Omit<ProductFormPayload, "session_identifier">) => {
         if (values && selectedProductQuantitySum > 0) {
@@ -427,6 +517,11 @@ const SelectProducts = (props: SelectProductsProps) => {
 
                                         {(category.products) && category.products.map((product) => {
                                             const currentProductIndex = productIndex;
+                                            const effectiveMinPerOrder = getEffectiveMinPerOrder(product);
+                                            const selectedProductQuantity = form.values.products?.[currentProductIndex]?.quantities?.reduce(
+                                                (sum, {quantity}) => sum + Number(quantity),
+                                                0,
+                                            ) ?? 0;
                                             const quantityRange = range(product.min_per_order || 1, product.max_per_order || 25)
                                                 .map((n) => n.toString());
                                             quantityRange.unshift("0");
@@ -490,6 +585,8 @@ const SelectProducts = (props: SelectProductsProps) => {
                                                                 event={event}
                                                                 product={product}
                                                                 form={form}
+                                                                effectiveMinPerOrder={effectiveMinPerOrder}
+                                                                selectedProductQuantity={selectedProductQuantity}
                                                             />
                                                         </div>
 

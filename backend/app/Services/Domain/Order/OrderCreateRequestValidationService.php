@@ -125,16 +125,32 @@ class OrderCreateRequestValidationService
     private function validateProductDetails(EventDomainObject $event, array $data): void
     {
         $products = $this->getProducts($data);
+        $selectedQuantitiesByProductId = collect($data['products'])
+            ->mapWithKeys(fn(array $productAndQuantities) => [
+                $productAndQuantities['product_id'] => collect($productAndQuantities['quantities'])->sum('quantity'),
+            ]);
 
         foreach ($data['products'] as $productIndex => $productAndQuantities) {
-            $this->validateSingleProductDetails($event, $productIndex, $productAndQuantities, $products);
+            $this->validateSingleProductDetails(
+                event: $event,
+                productIndex: $productIndex,
+                productAndQuantities: $productAndQuantities,
+                products: $products,
+                selectedQuantitiesByProductId: $selectedQuantitiesByProductId,
+            );
         }
     }
 
     /**
      * @throws ValidationException
      */
-    private function validateSingleProductDetails(EventDomainObject $event, int $productIndex, array $productAndQuantities, $products): void
+    private function validateSingleProductDetails(
+        EventDomainObject $event,
+        int $productIndex,
+        array $productAndQuantities,
+        Collection $products,
+        Collection $selectedQuantitiesByProductId,
+    ): void
     {
         $productId = $productAndQuantities['product_id'];
         $totalQuantity = collect($productAndQuantities['quantities'])->sum('quantity');
@@ -158,7 +174,8 @@ class OrderCreateRequestValidationService
         $this->validateProductQuantity(
             productIndex: $productIndex,
             productAndQuantities: $productAndQuantities,
-            product: $product
+            product: $product,
+            selectedQuantitiesByProductId: $selectedQuantitiesByProductId,
         );
 
         $this->validateProductTypeAndPrice(
@@ -184,7 +201,12 @@ class OrderCreateRequestValidationService
     /**
      * @throws ValidationException
      */
-    private function validateProductQuantity(int $productIndex, array $productAndQuantities, ProductDomainObject $product): void
+    private function validateProductQuantity(
+        int $productIndex,
+        array $productAndQuantities,
+        ProductDomainObject $product,
+        Collection $selectedQuantitiesByProductId,
+    ): void
     {
         $totalQuantity = collect($productAndQuantities['quantities'])->sum('quantity');
         $maxPerOrder = (int)$product->getMaxPerOrder() ?: 100;
@@ -202,7 +224,9 @@ class OrderCreateRequestValidationService
             ->quantity_available;
 
         # if there are fewer products available than the configured minimum, we allow less than the minimum to be purchased
-        $minPerOrder = min((int)$product->getMinPerOrder() ?: 1,
+        $minimumConfiguredQuantity = $this->getMinimumConfiguredQuantity($product, $selectedQuantitiesByProductId);
+
+        $minPerOrder = min($minimumConfiguredQuantity,
             $capacityMaximum ?: $maxPerOrder,
             $productAvailableQuantity ?: $maxPerOrder);
 
@@ -229,6 +253,23 @@ class OrderCreateRequestValidationService
                 ]),
             ]);
         }
+    }
+
+    private function getMinimumConfiguredQuantity(
+        ProductDomainObject $product,
+        Collection $selectedQuantitiesByProductId,
+    ): int
+    {
+        $minPerOrder = (int)$product->getMinPerOrder() ?: 1;
+        $linkedTicketProductId = $product->getMinPerOrderLinkedTicketProductId();
+
+        if ($linkedTicketProductId === null) {
+            return $minPerOrder;
+        }
+
+        $linkedTicketQuantity = (int)$selectedQuantitiesByProductId->get($linkedTicketProductId, 0);
+
+        return max($minPerOrder, $linkedTicketQuantity);
     }
 
     private function validateProductEvent(EventDomainObject $event, int $productId, ProductDomainObject $product): void

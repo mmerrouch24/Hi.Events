@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HiEvents\Services\Application\Handlers\Product;
 
 use Exception;
+use HiEvents\DomainObjects\Enums\ProductType;
 use HiEvents\DomainObjects\Interfaces\DomainObjectInterface;
 use HiEvents\DomainObjects\ProductDomainObject;
 use HiEvents\DomainObjects\ProductPriceDomainObject;
@@ -25,6 +26,7 @@ use HiEvents\Services\Infrastructure\DomainEvents\Events\ProductEvent;
 use HiEvents\Services\Infrastructure\HtmlPurifier\HtmlPurifierService;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -55,6 +57,8 @@ class EditProductHandler
                 'event_id' => $productsData->event_id,
                 'id' => $productsData->product_id,
             ];
+
+            $this->validateLinkedTicketProduct($productsData);
 
             $oldPriceQuantities = $this->getExistingPriceQuantities($productsData->product_id);
 
@@ -114,6 +118,7 @@ class EditProductHandler
                 'max_per_order' => $productsData->max_per_order,
                 'description' => $this->purifier->purify($productsData->description),
                 'min_per_order' => $productsData->min_per_order,
+                'min_per_order_linked_ticket_product_id' => $productsData->min_per_order_linked_ticket_product_id,
                 'is_hidden' => $productsData->is_hidden,
                 'start_collapsed' => $productsData->start_collapsed,
                 'hide_before_sale_start_date' => $productsData->hide_before_sale_start_date,
@@ -219,6 +224,39 @@ class EditProductHandler
             throw new CannotChangeProductTypeException(
                 __('Product type cannot be changed as products have been registered for this type')
             );
+        }
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validateLinkedTicketProduct(UpsertProductDTO $productsData): void
+    {
+        if ($productsData->min_per_order_linked_ticket_product_id === null) {
+            return;
+        }
+
+        if ($productsData->product_id === $productsData->min_per_order_linked_ticket_product_id) {
+            throw ValidationException::withMessages([
+                'min_per_order_linked_ticket_product_id' => __('A product cannot link its minimum quantity to itself.'),
+            ]);
+        }
+
+        $linkedProduct = $this->productRepository->findFirstWhere([
+            'event_id' => $productsData->event_id,
+            'id' => $productsData->min_per_order_linked_ticket_product_id,
+        ]);
+
+        if ($linkedProduct === null) {
+            throw ValidationException::withMessages([
+                'min_per_order_linked_ticket_product_id' => __('The linked ticket product could not be found for this event.'),
+            ]);
+        }
+
+        if ($linkedProduct->getProductType() !== ProductType::TICKET->name) {
+            throw ValidationException::withMessages([
+                'min_per_order_linked_ticket_product_id' => __('The linked product must be a ticket product.'),
+            ]);
         }
     }
 }

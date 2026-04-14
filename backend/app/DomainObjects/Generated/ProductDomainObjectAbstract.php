@@ -19,6 +19,7 @@ abstract class ProductDomainObjectAbstract extends \HiEvents\DomainObjects\Abstr
     final public const MAX_PER_ORDER = 'max_per_order';
     final public const DESCRIPTION = 'description';
     final public const MIN_PER_ORDER = 'min_per_order';
+    final public const MIN_PER_ORDER_LINKED_TICKET_PRODUCT_ID = 'min_per_order_linked_ticket_product_id';
     final public const SALES_VOLUME = 'sales_volume';
     final public const SALES_TAX_VOLUME = 'sales_tax_volume';
     final public const HIDE_BEFORE_SALE_START_DATE = 'hide_before_sale_start_date';
@@ -47,6 +48,7 @@ abstract class ProductDomainObjectAbstract extends \HiEvents\DomainObjects\Abstr
     protected ?int $max_per_order = null;
     protected ?string $description = null;
     protected ?int $min_per_order = null;
+    protected ?int $min_per_order_linked_ticket_product_id = null;
     protected float $sales_volume = 0.0;
     protected float $sales_tax_volume = 0.0;
     protected bool $hide_before_sale_start_date = false;
@@ -78,6 +80,7 @@ abstract class ProductDomainObjectAbstract extends \HiEvents\DomainObjects\Abstr
                     'max_per_order' => $this->max_per_order ?? null,
                     'description' => $this->description ?? null,
                     'min_per_order' => $this->min_per_order ?? null,
+                    'min_per_order_linked_ticket_product_id' => $this->min_per_order_linked_ticket_product_id ?? null,
                     'sales_volume' => $this->sales_volume ?? null,
                     'sales_tax_volume' => $this->sales_tax_volume ?? null,
                     'hide_before_sale_start_date' => $this->hide_before_sale_start_date ?? null,
@@ -196,6 +199,17 @@ abstract class ProductDomainObjectAbstract extends \HiEvents\DomainObjects\Abstr
     public function getMinPerOrder(): ?int
     {
         return $this->min_per_order;
+    }
+
+    public function setMinPerOrderLinkedTicketProductId(?int $min_per_order_linked_ticket_product_id): self
+    {
+        $this->min_per_order_linked_ticket_product_id = $min_per_order_linked_ticket_product_id;
+        return $this;
+    }
+
+    public function getMinPerOrderLinkedTicketProductId(): ?int
+    {
+        return $this->min_per_order_linked_ticket_product_id;
     }
 
     public function setSalesVolume(float $sales_volume): self

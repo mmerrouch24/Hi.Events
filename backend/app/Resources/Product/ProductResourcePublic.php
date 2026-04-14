@@ -22,6 +22,7 @@ class ProductResourcePublic extends JsonResource
             'description' => $this->getDescription(),
             'max_per_order' => $this->getMaxPerOrder(),
             'min_per_order' => $this->getMinPerOrder(),
+            'min_per_order_linked_ticket_product_id' => $this->getMinPerOrderLinkedTicketProductId(),
             'sale_start_date' => $this->getSaleStartDate(),
             'sale_end_date' => $this->getSaleEndDate(),
             'event_id' => $this->getEventId(),

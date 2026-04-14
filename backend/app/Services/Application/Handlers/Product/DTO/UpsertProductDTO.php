@@ -29,6 +29,7 @@ class UpsertProductDTO extends BaseDTO
         public readonly ?int             $max_per_order = 100,
         public readonly ?string          $description = null,
         public readonly ?int             $min_per_order = 0,
+        public readonly ?int             $min_per_order_linked_ticket_product_id = null,
         public readonly ?bool            $is_hidden = false,
         public readonly ?bool            $hide_before_sale_start_date = false,
         public readonly ?bool            $hide_after_sale_end_date = false,
@@ -45,4 +46,3 @@ class UpsertProductDTO extends BaseDTO
     {
     }
 }
-

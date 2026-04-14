@@ -12,9 +12,18 @@ interface TieredPricingProps {
     product: Product;
     form: UseFormReturnType<any>;
     productIndex: number;
+    effectiveMinPerOrder: number;
+    selectedProductQuantity: number;
 }
 
-export const TieredPricing = ({product, event, form, productIndex}: TieredPricingProps) => {
+export const TieredPricing = ({
+    product,
+    event,
+    form,
+    productIndex,
+    effectiveMinPerOrder,
+    selectedProductQuantity,
+}: TieredPricingProps) => {
     return (
         <>
             {product?.prices?.map((price, index) => {
@@ -61,7 +70,7 @@ export const TieredPricing = ({product, event, form, productIndex}: TieredPricin
                                     <>
                                         <NumberSelector
                                             className={'hi-product-quantity-selector'}
-                                            min={product.min_per_order ?? 0}
+                                            min={selectedProductQuantity === 0 ? effectiveMinPerOrder : 0}
                                             max={(Math.min(price.quantity_remaining ?? 50, product.max_per_order ?? 50))}
                                             fieldName={`products.${productIndex}.quantities.${index}.quantity`}
                                             formInstance={form}

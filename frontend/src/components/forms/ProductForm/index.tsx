@@ -1,6 +1,6 @@
 import {t, Trans} from "@lingui/macro";
 import {UseFormReturnType} from "@mantine/form";
-import {Event, Product, ProductPriceType, TaxAndFee, TaxAndFeeCalculationType, TaxAndFeeType} from "../../../types.ts";
+import {Event, Product, ProductPriceType, ProductType, TaxAndFee, TaxAndFeeCalculationType, TaxAndFeeType} from "../../../types.ts";
 import {
     ActionIcon,
     Alert,
@@ -217,9 +217,16 @@ export const ProductForm = ({form, product}: ProductFormProps) => {
 
     // Context-aware helpers
     const hasTaxes = form.values.tax_and_fee_ids && form.values.tax_and_fee_ids.length > 0;
-    const hasLimits = form.values.min_per_order || form.values.max_per_order;
+    const hasLimits = form.values.min_per_order || form.values.max_per_order || form.values.min_per_order_linked_ticket_product_id;
     const hasSalePeriod = form.values.sale_start_date || form.values.sale_end_date;
     const hasHighlight = form.values.is_highlighted;
+    const availableTicketProducts = event?.product_categories
+        ?.flatMap((category) => category.products ?? [])
+        ?.filter((eventProduct) => eventProduct.product_type === ProductType.Ticket && eventProduct.id !== product?.id)
+        ?.map((ticketProduct) => ({
+            value: String(ticketProduct.id),
+            label: ticketProduct.title,
+        })) ?? [];
 
     return (
         <>
@@ -442,6 +449,15 @@ export const ProductForm = ({form, product}: ProductFormProps) => {
                             <NumberInput {...form.getInputProps('max_per_order')} label={t`Maximum Per Order`}
                                          placeholder="10"/>
                         </InputGroup>
+                        <Select
+                            mt={16}
+                            clearable
+                            data={availableTicketProducts}
+                            {...form.getInputProps('min_per_order_linked_ticket_product_id')}
+                            label={t`Link minimum quantity to ticket product`}
+                            placeholder={t`No linked ticket product`}
+                            description={t`If selected, the effective minimum becomes the greater of the fixed minimum and the selected quantity for that ticket product.`}
+                        />
                     </Fieldset>
 
                     <Fieldset legend={

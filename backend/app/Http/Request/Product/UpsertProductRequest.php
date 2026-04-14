@@ -30,6 +30,7 @@ class UpsertProductRequest extends BaseRequest
             'prices.*.is_hidden' => ['boolean'],
             'description' => 'string|nullable',
             'min_per_order' => 'integer|nullable',
+            'min_per_order_linked_ticket_product_id' => 'integer|nullable',
             'is_hidden' => 'boolean',
             'hide_before_sale_start_date' => 'boolean',
             'hide_after_sale_end_date' => 'boolean',
