@@ -6,8 +6,9 @@ use HiEvents\DomainObjects\AttendeeDomainObject;
 use HiEvents\DomainObjects\EventDomainObject;
 use HiEvents\DomainObjects\EventSettingDomainObject;
 use HiEvents\DomainObjects\OrderDomainObject;
+use HiEvents\DomainObjects\OrderItemDomainObject;
 use HiEvents\DomainObjects\OrganizerDomainObject;
-use HiEvents\DomainObjects\Status\AttendeeStatus;
+use HiEvents\DomainObjects\Status\OrderStatus;
 use HiEvents\Events\CapacityChangedEvent;
 use HiEvents\Mail\Order\OrderCancelled;
 use HiEvents\Repository\Interfaces\AttendeeRepositoryInterface;
@@ -73,15 +74,17 @@ class OrderCancelServiceTest extends TestCase
         $order->shouldReceive('getId')->andReturn(1);
         $order->shouldReceive('getEmail')->andReturn('customer@example.com');
         $order->shouldReceive('isOrderAwaitingOfflinePayment')->andReturn(false);
-
+        $order->shouldReceive('isOrderCompleted')->andReturn(true);
         $order->shouldReceive('getLocale')->andReturn('en');
+        $order->shouldReceive('getOrderItems')->andReturn(new Collection([
+            (new OrderItemDomainObject())->setProductPriceId(1)->setQuantity(2),
+            (new OrderItemDomainObject())->setProductPriceId(2)->setQuantity(1),
+        ]));
 
         $attendee1 = m::mock(AttendeeDomainObject::class);
-        $attendee1->shouldReceive('getproductPriceId')->andReturn(1);
         $attendee1->shouldReceive('getProductId')->andReturn(10);
 
         $attendee2 = m::mock(AttendeeDomainObject::class);
-        $attendee2->shouldReceive('getproductPriceId')->andReturn(2);
         $attendee2->shouldReceive('getProductId')->andReturn(20);
 
         $attendees = new Collection([$attendee1, $attendee2]);
@@ -96,7 +99,8 @@ class OrderCancelServiceTest extends TestCase
 
         $this->attendeeRepository->shouldReceive('updateWhere')->once();
 
-        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->twice();
+        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->once()->with(1, 2);
+        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->once()->with(2, 1);
 
         $this->orderRepository->shouldReceive('updateWhere')->once();
 
@@ -135,10 +139,6 @@ class OrderCancelServiceTest extends TestCase
 
         $this->databaseManager->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) {
             $callback();
-        });
-
-        $attendees->each(function ($attendee) {
-            $attendee->shouldReceive('getStatus')->andReturn(AttendeeStatus::ACTIVE->name);
         });
 
         try {
@@ -165,14 +165,17 @@ class OrderCancelServiceTest extends TestCase
         $order->shouldReceive('getId')->andReturn(1);
         $order->shouldReceive('getEmail')->andReturn('customer@example.com');
         $order->shouldReceive('isOrderAwaitingOfflinePayment')->andReturn(true);
+        $order->shouldReceive('isOrderCompleted')->andReturn(false);
         $order->shouldReceive('getLocale')->andReturn('en');
+        $order->shouldReceive('getOrderItems')->andReturn(new Collection([
+            (new OrderItemDomainObject())->setProductPriceId(1)->setQuantity(3),
+            (new OrderItemDomainObject())->setProductPriceId(2)->setQuantity(4),
+        ]));
 
         $attendee1 = m::mock(AttendeeDomainObject::class);
-        $attendee1->shouldReceive('getproductPriceId')->andReturn(1);
         $attendee1->shouldReceive('getProductId')->andReturn(10);
 
         $attendee2 = m::mock(AttendeeDomainObject::class);
-        $attendee2->shouldReceive('getproductPriceId')->andReturn(2);
         $attendee2->shouldReceive('getProductId')->andReturn(20);
 
         $attendees = new Collection([$attendee1, $attendee2]);
@@ -187,7 +190,8 @@ class OrderCancelServiceTest extends TestCase
 
         $this->attendeeRepository->shouldReceive('updateWhere')->once();
 
-        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->twice();
+        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->once()->with(1, 3);
+        $this->productQuantityService->shouldReceive('decreaseQuantitySold')->once()->with(2, 4);
 
         $this->orderRepository->shouldReceive('updateWhere')->once();
 
@@ -228,10 +232,6 @@ class OrderCancelServiceTest extends TestCase
             $callback();
         });
 
-        $attendees->each(function ($attendee) {
-            $attendee->shouldReceive('getStatus')->andReturn(AttendeeStatus::AWAITING_PAYMENT->name);
-        });
-
         try {
             $this->service->cancelOrder($order);
         } catch (Throwable $e) {
@@ -239,5 +239,61 @@ class OrderCancelServiceTest extends TestCase
         }
 
         $this->assertTrue(true, "Order cancellation proceeded without throwing an exception.");
+    }
+
+    public function testCancelReservedOrderDoesNotDecreaseProductQuantities(): void
+    {
+        Event::fake();
+
+        $order = m::mock(OrderDomainObject::class);
+        $order->shouldReceive('getEventId')->andReturn(1);
+        $order->shouldReceive('getId')->andReturn(1);
+        $order->shouldReceive('getEmail')->andReturn('customer@example.com');
+        $order->shouldReceive('isOrderAwaitingOfflinePayment')->andReturn(false);
+        $order->shouldReceive('isOrderCompleted')->andReturn(false);
+        $order->shouldReceive('getLocale')->andReturn('en');
+        $order->shouldReceive('getStatus')->andReturn(OrderStatus::RESERVED->name);
+        $order->shouldReceive('getOrderItems')->andReturn(new Collection([
+            (new OrderItemDomainObject())->setProductPriceId(1)->setQuantity(2),
+        ]));
+
+        $attendee = m::mock(AttendeeDomainObject::class);
+        $attendee->shouldReceive('getProductId')->andReturn(10);
+        $attendees = new Collection([$attendee]);
+
+        $this->attendeeRepository
+            ->shouldReceive('findWhere')
+            ->twice()
+            ->with([
+                'order_id' => $order->getId(),
+            ])
+            ->andReturn($attendees);
+
+        $this->attendeeRepository->shouldReceive('updateWhere')->once();
+        $this->productQuantityService->shouldNotReceive('decreaseQuantitySold');
+        $this->orderRepository->shouldReceive('updateWhere')->once();
+        $this->eventStatisticsCancellationService->shouldReceive('decrementForCancelledOrder')
+            ->once()
+            ->with($order);
+
+        $event = new EventDomainObject();
+        $event->setEventSettings(new EventSettingDomainObject());
+        $event->setOrganizer(new OrganizerDomainObject());
+        $this->eventRepository
+            ->shouldReceive('loadRelation')
+            ->twice()
+            ->andReturnSelf()
+            ->getMock()
+            ->shouldReceive('findById')->once()->andReturn($event);
+
+        $this->mailer->shouldReceive('to')->once()->andReturnSelf();
+        $this->mailer->shouldReceive('locale')->once()->andReturnSelf();
+        $this->mailer->shouldReceive('send')->once()->withArgs(fn($mail) => $mail instanceof OrderCancelled);
+        $this->domainEventDispatcherService->shouldReceive('dispatch')->once();
+        $this->databaseManager->shouldReceive('transaction')->once()->andReturnUsing(function ($callback) {
+            $callback();
+        });
+
+        $this->service->cancelOrder($order);
     }
 }

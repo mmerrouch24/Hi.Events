@@ -5,8 +5,8 @@ namespace HiEvents\Services\Domain\Order;
 use HiEvents\DomainObjects\AttendeeDomainObject;
 use HiEvents\DomainObjects\EventSettingDomainObject;
 use HiEvents\DomainObjects\OrderDomainObject;
+use HiEvents\DomainObjects\OrderItemDomainObject;
 use HiEvents\DomainObjects\OrganizerDomainObject;
-use HiEvents\DomainObjects\Status\AttendeeStatus;
 use HiEvents\DomainObjects\Status\OrderStatus;
 use HiEvents\DomainObjects\Enums\CapacityChangeDirection;
 use HiEvents\Events\CapacityChangedEvent;
@@ -92,22 +92,28 @@ class OrderCancelService
 
     private function adjustProductQuantities(OrderDomainObject $order): void
     {
-        $attendees = $this->attendeeRepository->findWhere([
-            'order_id' => $order->getId(),
-        ])->filter(function (AttendeeDomainObject $attendee) use ($order) {
-            if ($order->isOrderAwaitingOfflinePayment()) {
-                return $attendee->getStatus() === AttendeeStatus::ACTIVE->name
-                    || $attendee->getStatus() === AttendeeStatus::AWAITING_PAYMENT->name;
-            }
+        if (!$order->isOrderCompleted() && !$order->isOrderAwaitingOfflinePayment()) {
+            return;
+        }
 
-            return $attendee->getStatus() === AttendeeStatus::ACTIVE->name;
-        });
+        $orderItems = $order->getOrderItems();
 
-        $productIdCountMap = $attendees
-            ->map(fn(AttendeeDomainObject $attendee) => $attendee->getProductPriceId())->countBy();
+        if ($orderItems === null) {
+            $orderItems = $this->orderRepository
+                ->loadRelation(OrderItemDomainObject::class)
+                ->findById($order->getId())
+                ?->getOrderItems();
+        }
 
-        foreach ($productIdCountMap as $productPriceId => $count) {
-            $this->productQuantityService->decreaseQuantitySold($productPriceId, $count);
+        if ($orderItems === null) {
+            return;
+        }
+
+        foreach ($orderItems as $orderItem) {
+            $this->productQuantityService->decreaseQuantitySold(
+                $orderItem->getProductPriceId(),
+                $orderItem->getQuantity()
+            );
         }
     }
 
